@@ -93,3 +93,5 @@ obj-$(CONFIG_VIDEO_ZYNQMP_DPSUB) += zynqmp/
 obj-y += bridge/
 obj-y += sunxi/
 obj-y += tegra/
+
+obj-$(CONFIG_VIDEO_PANEL_XINGBANGDA_XBD599) += panel-xingbangda-xbd599.o

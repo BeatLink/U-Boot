@@ -24,6 +24,9 @@ struct axp_regulator_plat {
 	u8		step_mV;
 	u8		split;
 	const u16	*table;
+	/* Mode values switching a GPIO pin to LDO and back, where enabling is not one bit. */
+	u8		enable_val;
+	u8		disable_val;
 };
 
 static int axp_regulator_get_value(struct udevice *dev)
@@ -83,6 +86,11 @@ static int axp_regulator_set_value(struct udevice *dev, int uV)
 			       plat->volt_mask, sel << shift);
 }
 
+static u8 axp_regulator_enable_val(const struct axp_regulator_plat *plat)
+{
+	return plat->enable_val ? plat->enable_val : plat->enable_mask;
+}
+
 static int axp_regulator_get_enable(struct udevice *dev)
 {
 	const struct axp_regulator_plat *plat = dev_get_plat(dev);
@@ -92,7 +100,7 @@ static int axp_regulator_get_enable(struct udevice *dev)
 	if (reg < 0)
 		return reg;
 
-	return (reg & plat->enable_mask) == plat->enable_mask;
+	return (reg & plat->enable_mask) == axp_regulator_enable_val(plat);
 }
 
 static int axp_regulator_set_enable(struct udevice *dev, bool enable)
@@ -101,7 +109,8 @@ static int axp_regulator_set_enable(struct udevice *dev, bool enable)
 
 	return pmic_clrsetbits(dev->parent, plat->enable_reg,
 			       plat->enable_mask,
-			       enable ? plat->enable_mask : 0);
+			       enable ? axp_regulator_enable_val(plat) :
+					plat->disable_val);
 }
 
 static const struct dm_regulator_ops axp_regulator_ops = {
@@ -285,6 +294,15 @@ static const struct axp_regulator_plat axp803_regulators[] = {
 	{ "fldo1", 0x13, BIT(2), 0x1c, 0x0f,  700, 1450,  50, NA },
 	{ "fldo2", 0x13, BIT(3), 0x1d, 0x0f,  700, 1450,  50, NA },
 	{ "dc1sw", 0x12, BIT(7),   NA,   NA,   NA,   NA,  NA, NA },
+	/* The GPIO pins double as LDOs, switched on by a mode field rather than one bit. */
+	{ .name = "ldo-io0", .enable_reg = 0x90, .enable_mask = 0x07,
+	  .enable_val = 0x03, .disable_val = 0x07, .volt_reg = 0x91,
+	  .volt_mask = 0x1f, .min_mV = 700, .max_mV = 3300, .step_mV = 100,
+	  .split = NA },
+	{ .name = "ldo-io1", .enable_reg = 0x92, .enable_mask = 0x07,
+	  .enable_val = 0x03, .disable_val = 0x07, .volt_reg = 0x93,
+	  .volt_mask = 0x1f, .min_mV = 700, .max_mV = 3300, .step_mV = 100,
+	  .split = NA },
 	{ }
 };
 

@@ -427,6 +427,16 @@ struct sunxi_ccm_reg {
 #define CCM_LCD_CH0_CTRL_RST		0
 #define CCM_LCD_CH0_CTRL_GATE		(0x1 << 31)
 
+/* TCON0 selects PLL_MIPI at mux value 0 on the A64, where the A31 has PLL3. */
+#define CCM_LCD_CH0_CTRL_A64_MIPI_PLL	(0 << 24)
+#define CCM_LCD_CH0_CTRL_SRC_MASK	(0x7 << 24)
+
+#define CCM_DSI_DPHY_DIV_MASK		0xf
+#define CCM_DSI_DPHY_DIV(n)		(((n) - 1) & 0xf)
+#define CCM_DSI_DPHY_SRC_MASK		(0x3 << 8)
+#define CCM_DSI_DPHY_SRC_PLL_VIDEO0	(0 << 8)
+#define CCM_DSI_DPHY_GATE		(0x1 << 15)
+
 #define CCM_LCD_CH1_CTRL_M(n)		((((n) - 1) & 0xf) << 0)
 #define CCM_LCD_CH1_CTRL_HALF_SCLK1	0 /* no seperate sclk1 & 2 on sun6i */
 #define CCM_LCD_CH1_CTRL_PLL3		(0 << 24)

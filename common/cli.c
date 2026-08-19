@@ -52,6 +52,8 @@ int run_command(const char *cmd, int flag)
 
 	return 0;
 #else
+	clear_ctrlc();		/* forget any previous Control C */
+
 	if (use_hush_old()) {
 		int hush_flags = FLAG_PARSE_SEMICOLON | FLAG_EXIT_FROM_LOOP;
 
@@ -91,6 +93,8 @@ int run_command_repeatable(const char *cmd, int flag)
 	return cli_simple_run_command(cmd, flag);
 #else
 	int ret;
+
+	clear_ctrlc();		/* forget any previous Control C */
 
 	if (use_hush_old()) {
 		ret = parse_string_outer(cmd,
@@ -145,6 +149,8 @@ int run_command_list(const char *cmd, int len, int flag)
 		buff[len] = '\0';
 	}
 #ifdef CONFIG_HUSH_PARSER
+	clear_ctrlc();		/* forget any previous Control C */
+
 	if (use_hush_old()) {
 		rcode = parse_string_outer(buff, FLAG_PARSE_SEMICOLON);
 	} else {

@@ -1121,6 +1121,25 @@ config VIDEO_DE2
 	Say y here if you want to build DE2 video driver which is present on
 	newer SoCs. Currently only HDMI output is supported.
 
+config VIDEO_SUNXI_MIPI_DSI
+	bool "Allwinner sun6i/sun50i MIPI-DSI host"
+	depends on VIDEO_DE2
+	select VIDEO_MIPI_DSI
+	help
+	  Say y here to support a panel wired to the MIPI-DSI host of the
+	  sun6i family, as found on the A31, A64 and A100. The panel is
+	  found through the host's node in the device tree and drives the
+	  timings of the whole pipeline.
+
+config SUNXI_VIDCONSOLE_FIRST
+	bool "Put the video console first in the default stdout"
+	depends on VIDEO_DE2
+	help
+	  A UEFI boot menu takes its console geometry from the first entry
+	  of stdout. Say y on a board whose menu is read on its own screen,
+	  like a phone, so the menu is drawn for the panel rather than for
+	  an 80x25 terminal. Serial still receives all output.
+
 
 choice
 	prompt "LCD panel support"

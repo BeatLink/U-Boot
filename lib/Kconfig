@@ -1298,6 +1298,8 @@ config PHANDLE_CHECK_SEQ
 	  enable this config option to distinguish them using
 	  phandles in fdtdec_get_alias_seq() function.
 
+source lib/PDCursesMod/Kconfig
+
 config UTHREAD
 	bool "Enable thread support"
 	depends on HAVE_INITJMP

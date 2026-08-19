@@ -252,7 +252,15 @@
 	"stdin=serial\0"
 #endif
 
-#ifdef CONFIG_VIDEO
+/*
+ * The panel comes first because EFI takes its console geometry from the head of
+ * this list, and a boot menu has to fit the screen it is read on.
+ */
+#if defined(CONFIG_VIDEO) && defined(CONFIG_SUNXI_VIDCONSOLE_FIRST)
+#define CONSOLE_STDOUT_SETTINGS \
+	"stdout=vidconsole,serial\0" \
+	"stderr=vidconsole,serial\0"
+#elif defined(CONFIG_VIDEO)
 #define CONSOLE_STDOUT_SETTINGS \
 	"stdout=serial,vidconsole\0" \
 	"stderr=serial,vidconsole\0"

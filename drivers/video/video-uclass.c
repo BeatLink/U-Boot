@@ -79,6 +79,8 @@ struct vid_rgb {
 	u32 b;
 };
 
+static bool video_is_dirty = false;
+
 void video_set_flush_dcache(struct udevice *dev, bool flush)
 {
 	struct video_priv *priv = dev_get_uclass_priv(dev);
@@ -120,6 +122,9 @@ static ulong alloc_fb(struct udevice *dev, ulong *addrp)
 
 	size = alloc_fb_(plat->align, plat->size, addrp);
 	plat->base = *addrp;
+
+	/* Clear the reserved famebuffer; some data might be sticking in from warm reset. */
+	memset((void *)plat->base, 0x00, size);
 
 	return size;
 }
@@ -507,10 +512,13 @@ int video_sync(struct udevice *vid, bool force)
 	}
 
 	if (CONFIG_IS_ENABLED(CYCLIC) && !force &&
-	    get_timer(priv->last_sync) < CONFIG_VIDEO_SYNC_MS)
+	    get_timer(priv->last_sync) < CONFIG_VIDEO_SYNC_MS) {
+		video_is_dirty = true;
 		return 0;
+	}
 
 	video_flush_dcache(vid, false);
+	video_is_dirty = false;
 
 	if (IS_ENABLED(CONFIG_VIDEO_COPY))
 		video_flush_dcache(vid, true);
@@ -563,6 +571,13 @@ bool video_is_active(void)
 	}
 
 	return false;
+}
+
+void video_sync_dirty(void)
+{
+	if (video_is_dirty) {
+		video_sync_all();
+	}
 }
 
 int video_get_xsize(struct udevice *dev)

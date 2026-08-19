@@ -303,6 +303,14 @@ config SIMPLE_PANEL
 	  This turns on a simple panel driver that enables a compatible
 	  video panel.
 
+config VIDEO_PANEL_XINGBANGDA_XBD599
+	bool "Xingbangda XBD599 MIPI-DSI panel"
+	depends on PANEL && BACKLIGHT && DM_GPIO && VIDEO_SUNXI_MIPI_DSI
+	help
+	  Enable support for the Xingbangda XBD599, a 720x1440 MIPI-DSI
+	  panel driven by a Sitronix ST7703 controller, as used on the
+	  PinePhone.
+
 config PANEL_HX8238D
 	bool "Enable Himax HX-8238D LCD driver"
 	depends on PANEL
@@ -1127,6 +1135,7 @@ config BMP
 config VIDEO_BMP_GZIP
 	bool "Gzip compressed BMP image support"
 	depends on BMP || SPLASH_SCREEN
+	select GZIP
 	help
 	  If this option is set, additionally to standard BMP
 	  images, gzipped BMP images can be displayed via the

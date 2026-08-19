@@ -67,6 +67,9 @@ static int set_pwm(struct pwm_backlight_priv *priv)
 		width = priv->period_ns * (priv->cur_level - priv->min_level);
 		duty_cycle = div_u64(width,
 				     (priv->max_level - priv->min_level));
+		/* A level above the table's top would ask for more than a full period. */
+		if (duty_cycle > priv->period_ns)
+			duty_cycle = priv->period_ns;
 		ret = pwm_set_config(priv->pwm, priv->channel, priv->period_ns,
 				     duty_cycle);
 	} else {
@@ -196,6 +199,7 @@ static int pwm_backlight_of_to_plat(struct udevice *dev)
 	struct ofnode_phandle_args args;
 	int index, ret, count, len;
 	const u32 *cell;
+	uint steps;
 
 	log_debug("start\n");
 	ret = uclass_get_device_by_phandle(UCLASS_REGULATOR, dev,
@@ -232,17 +236,52 @@ static int pwm_backlight_of_to_plat(struct udevice *dev)
 	index = dev_read_u32_default(dev, "default-brightness-level", 255);
 	cell = dev_read_prop(dev, "brightness-levels", &len);
 	count = len / sizeof(u32);
-	if (cell && count > index) {
-		priv->levels = malloc(len);
-		if (!priv->levels)
+	steps = dev_read_u32_default(dev, "num-interpolated-steps", 0);
+	if (cell && count) {
+		u32 *raw = malloc(len);
+		uint total = count;
+
+		if (!raw)
 			return log_ret(-ENOMEM);
-		ret = dev_read_u32_array(dev, "brightness-levels", priv->levels,
-					 count);
-		if (ret)
+		ret = dev_read_u32_array(dev, "brightness-levels", raw, count);
+		if (ret) {
+			free(raw);
 			return log_msg_ret("levels", ret);
-		priv->num_levels = count;
+		}
+
+		/* A brightness index counts interpolated levels, not listed ones. */
+		if (steps > 1 && count > 1) {
+			uint i, j;
+
+			/* A corrupt device tree must not size the table. */
+			if (steps > 0xffff || (count - 1) > 0xffff / steps) {
+				free(raw);
+				return log_msg_ret("steps", -EINVAL);
+			}
+			total = (count - 1) * steps + 1;
+			priv->levels = malloc(total * sizeof(u32));
+			if (!priv->levels) {
+				free(raw);
+				return log_ret(-ENOMEM);
+			}
+			for (i = 0; i < count - 1; i++) {
+				int from = raw[i], to = raw[i + 1];
+
+				for (j = 0; j < steps; j++)
+					priv->levels[i * steps + j] = from +
+						(to - from) * (int)j / (int)steps;
+			}
+			priv->levels[total - 1] = raw[count - 1];
+			free(raw);
+		} else {
+			priv->levels = raw;
+		}
+
+		if (index >= (int)total)
+			index = total - 1;
+		priv->num_levels = total;
 		priv->default_level = priv->levels[index];
-		priv->max_level = priv->levels[count - 1];
+		priv->max_level = priv->levels[total - 1];
 	} else {
 		priv->default_level = index;
 		priv->max_level = 255;

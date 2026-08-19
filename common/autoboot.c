@@ -20,6 +20,7 @@
 #include <memalign.h>
 #include <menu.h>
 #include <post.h>
+#include <splash.h>
 #include <time.h>
 #include <asm/global_data.h>
 #include <linux/delay.h>
@@ -356,10 +357,20 @@ static int abortboot_key_sequence(int bootdelay)
 	if (IS_ENABLED(CONFIG_AUTOBOOT_FLUSH_STDIN))
 		flush_stdin();
 #  ifdef CONFIG_AUTOBOOT_PROMPT
+	struct stdio_dev *vidconsole = console_search_dev(DEV_FLAGS_OUTPUT, "vidconsole");
+
 	/*
 	 * CONFIG_AUTOBOOT_PROMPT includes the %d for all boards.
 	 * To print the bootdelay value upon bootup.
 	 */
+
+	if (IS_ENABLED(CONFIG_SPLASH_SCREEN) && IS_ENABLED(CONFIG_CMD_BMP)) {
+		if (vidconsole) {
+			vidconsole->puts(vidconsole, ANSI_CLEAR_CONSOLE);
+			vidconsole->puts(vidconsole, "\e[99;0H");
+		}
+		splash_display();
+	}
 	printf(CONFIG_AUTOBOOT_PROMPT, bootdelay);
 #  endif
 
@@ -379,23 +390,36 @@ static int abortboot_key_sequence(int bootdelay)
 
 static void print_boot_delay(int bootdelay)
 {
-	printf(ANSI_CLEAR_LINE "\rHit any key to stop autoboot: %d", bootdelay);
+	puts(ANSI_CLEAR_LINE);
+	printf(ANSI_CURSOR_COLUMN, 1);
+	printf(CONFIG_AUTOBOOT_PROMPT, bootdelay);
 }
 
 static int abortboot_single_key(int bootdelay)
 {
 	int abort = 0;
 	unsigned long ts;
+	struct stdio_dev *vidconsole = console_search_dev(DEV_FLAGS_OUTPUT, "vidconsole");
 
+	if (IS_ENABLED(CONFIG_SPLASH_SCREEN) && IS_ENABLED(CONFIG_CMD_BMP)) {
+		if (vidconsole) {
+			vidconsole->puts(vidconsole, ANSI_CLEAR_CONSOLE);
+			vidconsole->puts(vidconsole, "\e[99;0H");
+		}
+		splash_display();
+	}
 	print_boot_delay(bootdelay);
 
 	/*
 	 * Check if key already pressed
 	 */
 	if (tstc()) {	/* we got a key press	*/
-		getchar();	/* consume input	*/
-		print_boot_delay(0);
-		abort = 1;	/* don't auto boot	*/
+		menukey = getchar();
+		if (!IS_ENABLED(CONFIG_AUTOBOOT_USE_MENUKEY) ||
+		    menukey == AUTOBOOT_MENUKEY) {
+			print_boot_delay(0);
+			abort = 1;	/* don't auto boot	*/
+		}
 	}
 
 	while ((bootdelay > 0) && (!abort)) {
@@ -404,14 +428,12 @@ static int abortboot_single_key(int bootdelay)
 		ts = get_timer(0);
 		do {
 			if (tstc()) {	/* we got a key press	*/
-				int key;
-
-				abort  = 1;	/* don't auto boot	*/
-				bootdelay = 0;	/* no more delay	*/
-				key = getchar();/* consume input	*/
-				if (IS_ENABLED(CONFIG_AUTOBOOT_USE_MENUKEY))
-					menukey = key;
-				break;
+				menukey = getchar();
+				if (!IS_ENABLED(CONFIG_AUTOBOOT_USE_MENUKEY) || menukey == AUTOBOOT_MENUKEY){
+					abort  = 1;	/* don't auto boot	*/
+					bootdelay = 0;	/* no more delay	*/
+					break;
+				}
 			}
 			udelay(10000);
 		} while (!abort && get_timer(ts) < 1000);
@@ -519,10 +541,13 @@ void autoboot_command(const char *s)
 			disable_ctrlc(prev);	/* restore Ctrl-C checking */
 	}
 
-	if (IS_ENABLED(CONFIG_AUTOBOOT_USE_MENUKEY) &&
-	    menukey == AUTOBOOT_MENUKEY) {
+	if (IS_ENABLED(CONFIG_AUTOBOOT_USE_MENUKEY)){
 		s = env_get("menucmd");
-		if (s)
+		if (s) {
+			int prev;
+			prev = disable_ctrlc(1); /* disable Ctrl-C checking */
 			run_command_list(s, -1, 0);
+			disable_ctrlc(prev);	/* restore Ctrl-C checking */
+		}
 	}
 }

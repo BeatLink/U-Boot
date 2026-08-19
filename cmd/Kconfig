@@ -3203,3 +3203,5 @@ config CMD_SPAWN_NUM_JOBS
 	  spawn command.
 
 endif
+
+source cmd/tow-boot/Kconfig
