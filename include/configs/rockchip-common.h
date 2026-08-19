@@ -14,7 +14,13 @@
 #ifndef CONFIG_XPL_BUILD
 
 #ifndef BOOT_TARGETS
-#define BOOT_TARGETS	"mmc1 mmc0 nvme scsi usb pxe dhcp spi"
+#if defined(CONFIG_TOW_BOOT_PREDICTABLE_BOOT_PREFER_EXTERNAL)
+/* More external storage first, network and SPI last */
+#define BOOT_TARGETS	"usb mmc1 scsi nvme mmc0 pxe dhcp spi"
+#else
+/* More internal storage first, network and SPI last */
+#define BOOT_TARGETS	"mmc0 nvme scsi mmc1 usb pxe dhcp spi"
+#endif
 #endif
 
 #ifdef CONFIG_ARM64

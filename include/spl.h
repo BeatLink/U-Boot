@@ -209,8 +209,9 @@ static inline const char *xpl_name(enum xpl_phase_t phase)
 	case PHASE_SPL:
 		return "SPL";
 	case PHASE_BOARD_F:
+		return "BOARD_F";
 	case PHASE_BOARD_R:
-		return "U-Boot";
+		return "BOARD_R";
 	default:
 		return "phase?";
 	}

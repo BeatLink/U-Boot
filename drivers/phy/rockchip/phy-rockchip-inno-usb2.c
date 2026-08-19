@@ -49,6 +49,8 @@ struct rockchip_usb2phy {
 	struct regmap *phy_base;
 	struct clk phyclk;
 	const struct rockchip_usb2phy_cfg *phy_cfg;
+	int init_count;
+	int power_on_count;
 };
 
 static inline int property_enable(struct regmap *base,
@@ -100,6 +102,10 @@ static int rockchip_usb2phy_power_on(struct phy *phy)
 	struct rockchip_usb2phy *priv = dev_get_priv(parent);
 	const struct rockchip_usb2phy_port_cfg *port_cfg = us2phy_get_port(phy);
 
+	priv->power_on_count++;
+	if (priv->power_on_count != 1)
+		return 0;
+
 	property_enable(priv->reg_base, &port_cfg->phy_sus, false);
 
 	/* waiting for the utmi_clk to become stable */
@@ -114,6 +120,10 @@ static int rockchip_usb2phy_power_off(struct phy *phy)
 	struct rockchip_usb2phy *priv = dev_get_priv(parent);
 	const struct rockchip_usb2phy_port_cfg *port_cfg = us2phy_get_port(phy);
 
+	priv->power_on_count--;
+	if (priv->power_on_count != 0)
+		return 0;
+
 	property_enable(priv->reg_base, &port_cfg->phy_sus, true);
 
 	return 0;
@@ -124,6 +134,10 @@ static int rockchip_usb2phy_init(struct phy *phy)
 	struct udevice *parent = dev_get_parent(phy->dev);
 	struct rockchip_usb2phy *priv = dev_get_priv(parent);
 	int ret;
+
+	priv->init_count++;
+	if (priv->init_count != 1)
+		return 0;
 
 	ret = clk_enable(&priv->phyclk);
 	if (ret && ret != -ENOSYS) {
@@ -138,6 +152,10 @@ static int rockchip_usb2phy_exit(struct phy *phy)
 {
 	struct udevice *parent = dev_get_parent(phy->dev);
 	struct rockchip_usb2phy *priv = dev_get_priv(parent);
+
+	priv->init_count--;
+	if (priv->init_count != 0)
+		return 0;
 
 	clk_disable(&priv->phyclk);
 
@@ -312,6 +330,9 @@ static int rockchip_usb2phy_probe(struct udevice *dev)
 
 	if (priv->phy_cfg->clkout_ctl_phy.enable)
 		ret = regmap_init_mem_index(dev_ofnode(dev), &priv->phy_base, 0);
+
+	priv->power_on_count = 0;
+	priv->init_count = 0;
 
 	return ret;
 }

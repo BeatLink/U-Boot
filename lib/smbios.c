@@ -18,6 +18,7 @@
 #include <tables_csum.h>
 #include <version.h>
 #include <malloc.h>
+#include <version_string.h>
 #include <dm/ofnode.h>
 #ifdef CONFIG_CPU
 #include <cpu.h>
@@ -375,10 +376,11 @@ static int smbios_write_type0(ulong *current, int handle,
 	fill_smbios_header(t, SMBIOS_BIOS_INFORMATION, len, handle);
 	smbios_set_eos(ctx, t->eos);
 	t->vendor = smbios_add_prop_si(ctx, NULL, SYSID_SM_BIOS_VENDOR,
-				       "U-Boot");
+				       "Tow-Boot");
 
+	/* The full version string identifies the Tow-Boot release. */
 	t->bios_ver = smbios_add_prop_si(ctx, "version", SYSID_SM_BIOS_VER,
-					 PLAIN_VERSION);
+					 version_string);
 	if (t->bios_ver)
 		gd->smbios_version = ctx->last_str;
 	log_debug("smbios_version = %p: '%s'\n", gd->smbios_version,
@@ -528,6 +530,39 @@ static int smbios_write_type2(ulong *current, int handle,
 	return len;
 }
 
+/**
+ * smbios_enclosure_from_string() - returns smbios byte value for chassis type string.
+ *
+ * The chassis type string values are the recommended root node properties as
+ * defined in the device tree specification 3.2 Root node.
+ *
+ * The byte values are the closest equivalent values as defined in the SMBIOS
+ * specification, 7.4.1 System Enclosure or Chassis Types.
+ */
+static int smbios_enclosure_from_string(const char *str)
+{
+	if (!strncmp(str, "desktop", 7))
+		return SMBIOS_ENCLOSURE_DESKTOP;
+	if (!strncmp(str, "laptop", 6))
+		return SMBIOS_ENCLOSURE_LAPTOP;
+	if (!strncmp(str, "convertible", 11))
+		return SMBIOS_ENCLOSURE_CONVERTIBLE;
+	if (!strncmp(str, "server", 6))
+		return SMBIOS_ENCLOSURE_MAIN_SERVER_CHASSIS;
+	if (!strncmp(str, "tablet", 6))
+		return SMBIOS_ENCLOSURE_TABLET;
+	/* Hand Held is the closest there is */
+	if (!strncmp(str, "handset", 7))
+		return SMBIOS_ENCLOSURE_HAND_HELD;
+	/* SMBIOS does not define watch */
+	if (!strncmp(str, "watch", 5))
+		return SMBIOS_ENCLOSURE_OTHER;
+	if (!strncmp(str, "embedded", 8))
+		return SMBIOS_ENCLOSURE_EMBEDDED_PC;
+
+	return SMBIOS_ENCLOSURE_UNKNOWN;
+}
+
 static int smbios_write_type3(ulong *current, int handle,
 			      struct smbios_ctx *ctx)
 {
@@ -563,6 +598,16 @@ static int smbios_write_type3(ulong *current, int handle,
 	t->chassis_type = smbios_get_val_si(ctx, "chassis-type",
 					    SYSID_SM_ENCLOSURE_TYPE,
 					    SMBIOS_ENCLOSURE_UNKNOWN);
+	if (t->chassis_type == SMBIOS_ENCLOSURE_UNKNOWN &&
+	    IS_ENABLED(CONFIG_OF_CONTROL)) {
+		/* The device tree spec /chassis-type property is a string. */
+		const char *chassis_type =
+			ofnode_read_string(ofnode_root(), "chassis-type");
+
+		if (chassis_type)
+			t->chassis_type =
+				smbios_enclosure_from_string(chassis_type);
+	}
 	t->bootup_state = smbios_get_val_si(ctx, "bootup-state",
 					    SYSID_SM_ENCLOSURE_BOOTUP,
 					    SMBIOS_STATE_UNKNOWN);
