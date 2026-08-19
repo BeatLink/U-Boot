@@ -1,0 +1,30 @@
+X-Powers AXP803 power key
+
+The PMIC latches a short press of the power key in its interrupt status
+registers. This node exposes that key as a button, so a boot menu can be
+driven on a device whose only input is its buttons.
+
+The node is a child of the PMIC node. This is a U-Boot specific binding:
+Linux drives the power key from the PMIC's interrupt controller without a
+node of its own, so the node belongs in a *-u-boot.dtsi overlay.
+
+Required properties:
+- compatible: "x-powers,axp803-pek"
+- label: name shown by the button command
+
+Optional properties:
+- u-boot,code: input event code the button-keyboard driver reports.
+  Read in preference to linux,code, so a key may mean something else in
+  U-Boot than it does under Linux. The Allwinner LRADC button driver
+  honours the same property.
+- linux,code: fallback when u-boot,code is absent.
+
+Example:
+
+&axp803 {
+	power-key {
+		compatible = "x-powers,axp803-pek";
+		label = "Power";
+		u-boot,code = <KEY_ENTER>;
+	};
+};

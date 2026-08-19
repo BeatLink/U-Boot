@@ -244,9 +244,15 @@
 
 #include <config_distro_bootcmd.h>
 
-#ifdef CONFIG_USB_KEYBOARD
+#if defined(CONFIG_USB_KEYBOARD) && defined(CONFIG_BUTTON_KEYBOARD)
+#define CONSOLE_STDIN_SETTINGS \
+	"stdin=serial,usbkbd,button-kbd\0"
+#elif defined(CONFIG_USB_KEYBOARD)
 #define CONSOLE_STDIN_SETTINGS \
 	"stdin=serial,usbkbd\0"
+#elif defined(CONFIG_BUTTON_KEYBOARD)
+#define CONSOLE_STDIN_SETTINGS \
+	"stdin=serial,button-kbd\0"
 #else
 #define CONSOLE_STDIN_SETTINGS \
 	"stdin=serial\0"

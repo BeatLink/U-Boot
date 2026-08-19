@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * U-Boot additions for the PinePhone: the three buttons act as a keyboard so
+ * the boot menu can be driven without a serial console.
+ *
+ * `u-boot,code` is read in preference to `linux,code`, so the volume keys keep
+ * their own meaning under Linux.
+ */
+
+#include "sunxi-u-boot.dtsi"
+#include <dt-bindings/input/input.h>
+
+&lradc {
+	button-200 {
+		u-boot,code = <KEY_UP>;
+	};
+
+	button-400 {
+		u-boot,code = <KEY_DOWN>;
+	};
+};
+
+&axp803 {
+	power-key {
+		compatible = "x-powers,axp803-pek";
+		label = "Power";
+		u-boot,code = <KEY_ENTER>;
+	};
+};

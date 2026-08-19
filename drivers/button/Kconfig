@@ -49,3 +49,17 @@ config BUTTON_QCOM_PMIC
 	  respectively, allowing navigation of bootmenu with buttons on device.
 
 endmenu
+
+config BUTTON_SUN4I_LRADC
+	bool "Allwinner LRADC buttons"
+	depends on BUTTON && ARCH_SUNXI
+	help
+	  Enable support for the buttons wired to the low-resolution ADC of
+	  Allwinner SoCs, such as the volume keys of the PinePhone.
+
+config BUTTON_AXP_PEK
+	bool "X-Powers AXP power key"
+	depends on BUTTON && PMIC_AXP
+	help
+	  Enable support for the power key of an X-Powers AXP PMIC, read from
+	  the interrupt status the PMIC latches when the key is pressed.

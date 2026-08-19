@@ -36,6 +36,7 @@ obj-$(CONFIG_$(PHASE_)RTC) += rtc/
 obj-$(CONFIG_$(PHASE_)SERIAL) += serial/
 obj-$(CONFIG_$(PHASE_)SPI) += spi/
 obj-$(CONFIG_$(PHASE_)TIMER) += timer/
+obj-$(CONFIG_$(PHASE_)VIBRATOR) += vibrator/
 obj-$(CONFIG_$(PHASE_)VIRTIO) += virtio/
 obj-$(CONFIG_$(PHASE_)DM_MAILBOX) += mailbox/
 obj-$(CONFIG_$(PHASE_)REMOTEPROC) += remoteproc/
