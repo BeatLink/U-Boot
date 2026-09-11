@@ -496,6 +496,7 @@ static int usb_kbd_probe_dev(struct usb_device *dev, unsigned int ifnum)
 	struct usb_kbd_pdata *data;
 	unsigned int quirks = 0;
 	int epNum;
+	int ret;
 
 	if (dev->descriptor.bNumConfigurations != 1)
 		return 0;
@@ -594,8 +595,10 @@ static int usb_kbd_probe_dev(struct usb_device *dev, unsigned int ifnum)
 	if (usb_get_report(dev, iface->desc.bInterfaceNumber,
 			   1, 0, data->new, USB_KBD_BOOT_REPORT_SIZE) < 0) {
 #else
-	if (usb_int_msg(dev, data->intpipe, data->new, data->intpktsize,
-			data->intinterval, false) < 0) {
+	ret = usb_int_msg(dev, data->intpipe, data->new, data->intpktsize,
+			  data->intinterval, false);
+	/* Silence here means reports come only on a keypress, not a fault. */
+	if (ret < 0 && ret != -ETIMEDOUT) {
 #endif
 		printf("Failed to get keyboard state from device %04x:%04x\n",
 		       dev->descriptor.idVendor, dev->descriptor.idProduct);
