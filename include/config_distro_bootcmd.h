@@ -309,7 +309,13 @@
 	"boot_net_usb_start=usb start\0" \
 	"usb_boot=" \
 		"usb start; " \
-		BOOTENV_SHARED_BLKDEV_BODY(usb)
+		/* Storage does not always land on device 0, so try each. */ \
+		"for devnum in 0 1 2 3; do " \
+			"if usb dev ${devnum}; then " \
+				"devtype=usb; " \
+				"run scan_dev_for_boot_part; " \
+			"fi; " \
+		"done\0"
 #define BOOTENV_DEV_USB		BOOTENV_DEV_BLKDEV
 #define BOOTENV_DEV_NAME_USB	BOOTENV_DEV_NAME_BLKDEV
 #elif defined(CONFIG_XPL_BUILD)
