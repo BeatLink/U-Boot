@@ -1545,20 +1545,31 @@ static int _ehci_submit_int_msg(struct usb_device *dev, unsigned long pipe,
 	if (!queue)
 		return -1;
 
-	timeout = get_timer(0) + USB_TIMEOUT_MS(pipe);
+	/*
+	 * A non-blocking caller polls again on its own, so give the device
+	 * one service interval to answer instead of the full timeout, and
+	 * stay quiet when it has nothing to say.
+	 */
+	timeout = get_timer(0) +
+		  (nonblock ? (interval > 0 ? interval : 1) : USB_TIMEOUT_MS(pipe));
 	while ((backbuffer = _ehci_poll_int_queue(dev, queue)) == NULL)
 		if (get_timer(0) > timeout) {
-			printf("Timeout poll on interrupt endpoint\n");
-			result = -ETIMEDOUT;
+			if (nonblock) {
+				result = -EAGAIN;
+			} else {
+				printf("Timeout poll on interrupt endpoint\n");
+				result = -ETIMEDOUT;
+			}
 			break;
 		}
 
-	if (backbuffer != buffer) {
+	if (!result && backbuffer != buffer) {
 		debug("got wrong buffer back (%p instead of %p)\n",
 		      backbuffer, buffer);
-		return -EINVAL;
+		result = -EINVAL;
 	}
 
+	/* The queue must go even when the transfer failed. */
 	ret = _ehci_destroy_int_queue(dev, queue);
 	if (ret < 0)
 		return ret;
