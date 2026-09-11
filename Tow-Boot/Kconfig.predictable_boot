@@ -14,3 +14,13 @@ config TOW_BOOT_PREDICTABLE_BOOT_PREFER_EXTERNAL
 	bool "Prefer the more external storage first"
 
 endchoice
+
+config TOW_BOOT_NETWORK_BOOT
+	bool "Include network boot in the boot order"
+	default y
+	help
+		Puts the PXE and DHCP targets at the end of the predictable boot
+		order. Turning this off leaves both commands in place but keeps
+		them out of the automatic sequence, where a board that has no
+		network boot to do spends about a minute timing out on TFTP
+		before it gives up and falls into the menu.

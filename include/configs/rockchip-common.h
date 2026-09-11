@@ -60,13 +60,13 @@
 	#define BOOT_TARGET_USB(func)
 #endif
 
-#if CONFIG_IS_ENABLED(CMD_PXE)
+#if CONFIG_IS_ENABLED(CMD_PXE) && defined(CONFIG_TOW_BOOT_NETWORK_BOOT)
 	#define BOOT_TARGET_PXE(func) func(PXE, pxe, na)
 #else
 	#define BOOT_TARGET_PXE(func)
 #endif
 
-#if CONFIG_IS_ENABLED(CMD_DHCP)
+#if CONFIG_IS_ENABLED(CMD_DHCP) && defined(CONFIG_TOW_BOOT_NETWORK_BOOT)
 	#define BOOT_TARGET_DHCP(func) func(DHCP, dhcp, na)
 #else
 	#define BOOT_TARGET_DHCP(func)
