@@ -675,8 +675,12 @@ int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
 	 * the next transfer. It is the responsibility of the upper layer to
 	 * have dealt with whatever caused the error.
 	 */
-	if ((le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK) == EP_STATE_HALTED)
+	if ((le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK) == EP_STATE_HALTED) {
 		reset_ep(udev, ep_index);
+		/* The controller writes the new state straight to memory. */
+		xhci_inval_cache((uintptr_t)virt_dev->out_ctx->bytes,
+				 virt_dev->out_ctx->size);
+	}
 
 	ring = virt_dev->eps[ep_index].ring;
 	if (!ring)
@@ -713,8 +717,13 @@ int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
 	 */
 	ret = prepare_ring(ctrl, ring,
 			   le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK);
-	if (ret < 0)
+	if (ret < 0) {
+		/* Tell the upper layer to clear the halt we could not. */
+		if ((le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK) ==
+		    EP_STATE_HALTED)
+			udev->status = USB_ST_STALLED;
 		return ret;
+	}
 
 	/*
 	 * Don't give the first TRB to the hardware (by toggling the cycle bit)
