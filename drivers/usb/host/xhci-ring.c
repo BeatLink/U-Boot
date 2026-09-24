@@ -504,13 +504,15 @@ union xhci_trb *xhci_wait_for_event(struct xhci_ctrl *ctrl, trb_type expected)
 
 /*
  * Send reset endpoint command for given endpoint. This recovers from a
- * halted endpoint (e.g. due to a stall error).
+ * halted endpoint (e.g. due to a stall error). Returns 0 once the endpoint
+ * is stopped and its dequeue pointer is at our enqueue pointer.
  */
-static void reset_ep(struct usb_device *udev, int ep_index)
+static int reset_ep(struct usb_device *udev, int ep_index)
 {
 	struct xhci_ctrl *ctrl = xhci_get_ctrl(udev);
 	struct xhci_ring *ring =  ctrl->devs[udev->slot_id]->eps[ep_index].ring;
 	union xhci_trb *event;
+	xhci_comp_code comp;
 	u64 addr;
 	u32 field;
 
@@ -518,21 +520,34 @@ static void reset_ep(struct usb_device *udev, int ep_index)
 	xhci_queue_command(ctrl, 0, udev->slot_id, ep_index, TRB_RESET_EP);
 	event = xhci_wait_for_event(ctrl, TRB_COMPLETION);
 	if (!event)
-		return;
+		return -ETIMEDOUT;
 
 	field = le32_to_cpu(event->trans_event.flags);
 	BUG_ON(TRB_TO_SLOT_ID(field) != udev->slot_id);
+	comp = GET_COMP_CODE(le32_to_cpu(event->event_cmd.status));
 	xhci_acknowledge_event(ctrl);
+	if (comp != COMP_SUCCESS) {
+		printf("Reset EP %d failed, completion code %d\n", ep_index, comp);
+		return -EIO;
+	}
+
 	addr = xhci_trb_virt_to_dma(ring->enq_seg, ring->enqueue) |
 		ring->cycle_state;
 	xhci_queue_command(ctrl, addr, udev->slot_id, ep_index, TRB_SET_DEQ);
 	event = xhci_wait_for_event(ctrl, TRB_COMPLETION);
 	if (!event)
-		return;
+		return -ETIMEDOUT;
 
-	BUG_ON(TRB_TO_SLOT_ID(le32_to_cpu(event->event_cmd.flags)) != udev->slot_id ||
-	       GET_COMP_CODE(le32_to_cpu(event->event_cmd.status)) != COMP_SUCCESS);
+	BUG_ON(TRB_TO_SLOT_ID(le32_to_cpu(event->event_cmd.flags)) != udev->slot_id);
+	comp = GET_COMP_CODE(le32_to_cpu(event->event_cmd.status));
 	xhci_acknowledge_event(ctrl);
+	if (comp != COMP_SUCCESS) {
+		printf("Set TR dequeue on EP %d failed, completion code %d\n",
+		       ep_index, comp);
+		return -EIO;
+	}
+
+	return 0;
 }
 
 /*
@@ -657,6 +672,7 @@ int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
 	u64 buf_64 = xhci_dma_map(ctrl, buffer, length);
 	dma_addr_t last_transfer_trb_addr;
 	int available_length;
+	u32 ep_state;
 
 	debug("dev=%p, pipe=%lx, buffer=%p, length=%d\n",
 		udev, pipe, buffer, length);
@@ -675,11 +691,18 @@ int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
 	 * the next transfer. It is the responsibility of the upper layer to
 	 * have dealt with whatever caused the error.
 	 */
-	if ((le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK) == EP_STATE_HALTED) {
-		reset_ep(udev, ep_index);
-		/* The controller writes the new state straight to memory. */
-		xhci_inval_cache((uintptr_t)virt_dev->out_ctx->bytes,
-				 virt_dev->out_ctx->size);
+	ep_state = le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK;
+	if (ep_state == EP_STATE_HALTED) {
+		if (reset_ep(udev, ep_index)) {
+			/* Tell the upper layer to clear the halt we could not. */
+			udev->status = USB_ST_STALLED;
+			return -EPIPE;
+		}
+		/*
+		 * Set TR Dequeue Pointer only succeeds on a stopped endpoint,
+		 * so the endpoint is stopped whatever the cached context says.
+		 */
+		ep_state = EP_STATE_STOPPED;
 	}
 
 	ring = virt_dev->eps[ep_index].ring;
@@ -715,15 +738,9 @@ int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
 	 * prepare_trasfer() as there in 'Linux' since we are not
 	 * maintaining multiple TDs/transfer at the same time.
 	 */
-	ret = prepare_ring(ctrl, ring,
-			   le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK);
-	if (ret < 0) {
-		/* Tell the upper layer to clear the halt we could not. */
-		if ((le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK) ==
-		    EP_STATE_HALTED)
-			udev->status = USB_ST_STALLED;
+	ret = prepare_ring(ctrl, ring, ep_state);
+	if (ret < 0)
 		return ret;
-	}
 
 	/*
 	 * Don't give the first TRB to the hardware (by toggling the cycle bit)
@@ -869,6 +886,7 @@ int xhci_ctrl_tx(struct usb_device *udev, unsigned long pipe,
 	struct xhci_ring *ep_ring;
 	union xhci_trb *event;
 	u32 remainder;
+	u32 ep_state;
 
 	debug("req=%u (%#x), type=%u (%#x), value=%u (%#x), index=%u\n",
 		req->request, req->request,
@@ -898,6 +916,19 @@ int xhci_ctrl_tx(struct usb_device *udev, unsigned long pipe,
 	struct xhci_ep_ctx *ep_ctx = NULL;
 	ep_ctx = xhci_get_ep_ctx(ctrl, virt_dev->out_ctx, ep_index);
 
+	/*
+	 * A control endpoint halts on a transaction error just like a bulk
+	 * one, and nothing else ever resets it, so resume it here too.
+	 */
+	ep_state = le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK;
+	if (ep_state == EP_STATE_HALTED) {
+		if (reset_ep(udev, ep_index)) {
+			udev->status = USB_ST_STALLED;
+			return -EPIPE;
+		}
+		ep_state = EP_STATE_STOPPED;
+	}
+
 	/* 1 TRB for setup, 1 for status */
 	num_trbs = 2;
 	/*
@@ -913,8 +944,7 @@ int xhci_ctrl_tx(struct usb_device *udev, unsigned long pipe,
 	 * prepare_trasfer() as there in 'Linux' since we are not
 	 * maintaining multiple TDs/transfer at the same time.
 	 */
-	ret = prepare_ring(ctrl, ep_ring,
-				le32_to_cpu(ep_ctx->ep_info) & EP_STATE_MASK);
+	ret = prepare_ring(ctrl, ep_ring, ep_state);
 
 	if (ret < 0)
 		return ret;
