@@ -309,13 +309,19 @@
 	"boot_net_usb_start=usb start\0" \
 	"usb_boot=" \
 		"usb start; " \
-		/* Storage does not always land on device 0, so try each. */ \
-		"for devnum in 0 1 2 3; do " \
-			"if usb dev ${devnum}; then " \
-				"devtype=usb; " \
-				"run scan_dev_for_boot_part; " \
-			"fi; " \
-		"done\0"
+		/* A bridge can drop off the bus during its first scan, so scan again after usb_rescan brings it back. */ \
+		"for usbpass in 1 2; do " \
+			/* Storage does not always land on device 0, so try each. */ \
+			"for devnum in 0 1 2 3; do " \
+				"if usb dev ${devnum}; then " \
+					"devtype=usb; " \
+					"run scan_dev_for_boot_part; " \
+				"fi; " \
+			"done; " \
+			"run usb_rescan; " \
+		"done\0" \
+	/* A board whose bridge needs its power cut to come back overrides this with a rail cycle. */ \
+	"usb_rescan=usb reset\0"
 #define BOOTENV_DEV_USB		BOOTENV_DEV_BLKDEV
 #define BOOTENV_DEV_NAME_USB	BOOTENV_DEV_NAME_BLKDEV
 #elif defined(CONFIG_XPL_BUILD)
