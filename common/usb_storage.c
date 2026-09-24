@@ -100,6 +100,7 @@ struct us_data {
 	trans_reset	transport_reset;	/* reset routine */
 	trans_cmnd	transport;		/* transport routine */
 	unsigned short	max_xfer_blk;		/* maximum transfer blocks */
+	unsigned int	failures;		/* transports failed in a row */
 	bool		cmd12;			/* use 12-byte commands (RBC/UFI) */
 };
 
@@ -717,7 +718,8 @@ static int usb_stor_BBB_clear_endpt_stall(struct us_data *us, __u8 endpt)
 			       endpt, NULL, 0, USB_CNTL_TIMEOUT * 5);
 }
 
-static int usb_stor_BBB_transport(struct scsi_cmd *srb, struct us_data *us)
+static int usb_stor_BBB_transport_once(struct scsi_cmd *srb,
+				       struct us_data *us)
 {
 	int result, retry;
 	int dir_in;
@@ -835,6 +837,31 @@ again:
 	} else if (csw->bCSWStatus == CSWSTATUS_FAILED) {
 		debug("FAILED\n");
 		return USB_STOR_TRANSPORT_FAILED;
+	}
+
+	return result;
+}
+
+/*
+ * A device that answers nothing but errors is not coming back without
+ * outside help, and the callers above retry each command several times,
+ * so cap the failures in a row rather than spend minutes on a dead disk.
+ */
+#define USB_STOR_MAX_FAILURES	8
+
+static int usb_stor_BBB_transport(struct scsi_cmd *srb, struct us_data *us)
+{
+	int result;
+
+	if (us->failures >= USB_STOR_MAX_FAILURES)
+		return USB_STOR_TRANSPORT_FAILED;
+
+	result = usb_stor_BBB_transport_once(srb, us);
+	if (result == USB_STOR_TRANSPORT_GOOD) {
+		us->failures = 0;
+	} else if (++us->failures == USB_STOR_MAX_FAILURES) {
+		printf("USB storage device %d stopped answering, giving up on it\n",
+		       us->pusb_dev->devnum);
 	}
 
 	return result;
