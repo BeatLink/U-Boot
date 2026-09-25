@@ -268,19 +268,26 @@
 
 #include <config_distro_bootcmd.h>
 
-#if defined(CONFIG_USB_KEYBOARD) && defined(CONFIG_BUTTON_KEYBOARD)
-#define CONSOLE_STDIN_SETTINGS \
-	"stdin=serial,usbkbd,button-kbd\0"
-#elif defined(CONFIG_USB_KEYBOARD)
-#define CONSOLE_STDIN_SETTINGS \
-	"stdin=serial,usbkbd\0"
-#elif defined(CONFIG_BUTTON_KEYBOARD)
-#define CONSOLE_STDIN_SETTINGS \
-	"stdin=serial,button-kbd\0"
+#ifdef CONFIG_USB_KEYBOARD
+#define STDIN_USB_KBD ",usbkbd"
 #else
-#define CONSOLE_STDIN_SETTINGS \
-	"stdin=serial\0"
+#define STDIN_USB_KBD
 #endif
+
+#ifdef CONFIG_BUTTON_KEYBOARD
+#define STDIN_BUTTON_KBD ",button-kbd"
+#else
+#define STDIN_BUTTON_KBD
+#endif
+
+#ifdef CONFIG_PINEPHONE_KEYBOARD
+#define STDIN_PINEPHONE_KBD ",pinephone-kbd"
+#else
+#define STDIN_PINEPHONE_KBD
+#endif
+
+#define CONSOLE_STDIN_SETTINGS \
+	"stdin=serial" STDIN_USB_KBD STDIN_BUTTON_KBD STDIN_PINEPHONE_KBD "\0"
 
 /*
  * The panel comes first because EFI takes its console geometry from the head of

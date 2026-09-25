@@ -55,6 +55,14 @@ config BUTTON_KEYBOARD
 	  dt node to define button-event mapping.
 	  For example, an arrows and enter may be implemented to navigate boot menu.
 
+config PINEPHONE_KEYBOARD
+	bool "PinePhone keyboard case"
+	depends on DM_KEYBOARD && DM_I2C
+	help
+	  Enable support for the PinePhone keyboard case, whose MCU reports
+	  its key matrix over the pogo-pin I2C bus. Fn selects the second
+	  layer, which carries the arrow keys the boot menus need.
+
 config CPCAP_POWER_BUTTON
 	bool "Enable power button of CPCAP PMIC support"
 	depends on DM_KEYBOARD && DM_PMIC_CPCAP
