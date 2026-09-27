@@ -157,6 +157,10 @@ static int ppkb_probe(struct udevice *dev)
 	return input_stdio_register(sdev);
 }
 
+/* The keyboard uclass calls start and stop through ops unconditionally, so a driver without ops jumps to address 0. */
+static const struct keyboard_ops ppkb_ops = {
+};
+
 static const struct udevice_id ppkb_ids[] = {
 	{ .compatible = "pine64,pinephone-keyboard" },
 	{ }
@@ -166,6 +170,7 @@ U_BOOT_DRIVER(pinephone_kbd) = {
 	.name		= "pinephone_kbd",
 	.id		= UCLASS_KEYBOARD,
 	.of_match	= ppkb_ids,
+	.ops		= &ppkb_ops,
 	.probe		= ppkb_probe,
 	.priv_auto	= sizeof(struct ppkb_priv),
 };
