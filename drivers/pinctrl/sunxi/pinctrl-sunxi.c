@@ -630,6 +630,7 @@ static const struct sunxi_pinctrl_function sun50i_a64_pinctrl_functions[] = {
 	{ "gpio_out",	1 },
 	{ "i2c0",	2 },	/* PH0-PH1 */
 	{ "i2c1",	2 },	/* PH2-PH3 */
+	{ "i2c2",	3 },	/* PE14-PE15 */
 	{ "mmc0",	2 },	/* PF0-PF5 */
 	{ "mmc1",	2 },	/* PG0-PG5 */
 	{ "mmc2",	3 },	/* PC1-PC16 */
