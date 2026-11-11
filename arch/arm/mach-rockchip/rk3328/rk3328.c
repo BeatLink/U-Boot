@@ -16,9 +16,6 @@
 #define FW_DDR_CON_REG		0xFF7C0040
 #define EFUSE_NS_BASE		0xFF260000
 
-#define CRU_GLB_CNT_TH		0x0090
-#define WDT_GLB_SRST_CTRL	BIT(14)
-
 #define EFUSE_MOD		0x0000
 #define EFUSE_INT_CON		0x0014
 #define EFUSE_T_CSB_P		0x0028
@@ -72,9 +69,6 @@ int arch_cpu_init(void)
 
 	/* Disable the ddr secure region setting to make it non-secure */
 	rk_setreg(FW_DDR_CON_REG, 0x200);
-
-	/* Watchdog triggers the first global reset; the default second one hangs the SoC */
-	setbits_le32(CRU_BASE + CRU_GLB_CNT_TH, WDT_GLB_SRST_CTRL);
 
 	/* Use efuse auto mode */
 	reg = readl(EFUSE_NS_BASE + EFUSE_MOD);
